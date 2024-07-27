@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -21,10 +22,18 @@ class MandelBrot {
   public:
     MandelBrot(size_t width_, size_t height_)
         : width(width_)
-        , height(height_)
-        , pixels(width * height) {
-        std::cout << pixels.size() << '\n';
+        , height(height_) {
+        pixels = static_cast<u32*>(aligned_alloc(64, sizeof(u32) * width * height));
     }
+    ~MandelBrot() {
+        free(pixels);
+        pixels = nullptr;
+    }
+
+    MandelBrot(const MandelBrot &) = delete;
+    MandelBrot(MandelBrot &&) = delete;
+    MandelBrot& operator=(const MandelBrot &) = delete;
+    MandelBrot& operator=(MandelBrot &&) = delete;
 
     u32 &getPixelRef(size_t x, size_t y) { return pixels[y * width + x]; }
 
@@ -38,12 +47,12 @@ class MandelBrot {
         return {2 * px - 1.5, 2 * py - 1};
     }
 
-    const u32 *getRGBA() const { return pixels.data(); }
+    const u32 *getRGBA() const { return pixels; }
 
   private:
     const size_t width;
     const size_t height;
-    std::vector<u32> pixels;
+    u32* pixels;
 };
 
 unsigned char toU8(double v) { return v * 255.0; }
