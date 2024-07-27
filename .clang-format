@@ -1,0 +1,6 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+BreakConstructorInitializers: BeforeComma
+NamespaceIndentation: None
+ColumnLimit: 120
