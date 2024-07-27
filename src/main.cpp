@@ -23,7 +23,7 @@ class MandelBrot {
     MandelBrot(size_t width_, size_t height_)
         : width(width_)
         , height(height_) {
-        pixels = static_cast<u32*>(aligned_alloc(64, sizeof(u32) * width * height));
+        pixels = static_cast<u32 *>(aligned_alloc(64, sizeof(u32) * width * height));
     }
     ~MandelBrot() {
         free(pixels);
@@ -32,8 +32,8 @@ class MandelBrot {
 
     MandelBrot(const MandelBrot &) = delete;
     MandelBrot(MandelBrot &&) = delete;
-    MandelBrot& operator=(const MandelBrot &) = delete;
-    MandelBrot& operator=(MandelBrot &&) = delete;
+    MandelBrot &operator=(const MandelBrot &) = delete;
+    MandelBrot &operator=(MandelBrot &&) = delete;
 
     u32 &getPixelRef(size_t x, size_t y) { return pixels[y * width + x]; }
 
@@ -52,7 +52,7 @@ class MandelBrot {
   private:
     const size_t width;
     const size_t height;
-    u32* pixels;
+    u32 *pixels;
 };
 
 unsigned char toU8(double v) { return v * 255.0; }
@@ -71,15 +71,18 @@ u32 colorPixel(float x, float y) {
     float cx = 0.0;
     float cy = 0.0;
     u32 iter = 0;
-    while (iter < 256 && cx * cx + cy * cy < 2.0) {
+    const u32 maxIter = 256;
+    while (iter < maxIter && cx * cx + cy * cy < 4.0) {
         const float ncx = cx * cx - cy * cy;
         const float ncy = 2 * cx * cy;
         cx = ncx + x;
         cy = ncy + y;
         ++iter;
     }
-    u32 light = 256 - iter;
-    return rgba(light / 256.0, light / 256.0, 0, 1);
+    float light = powf((maxIter - iter) / (float)maxIter, 2.0);
+    float b = std::min(light * 2.0, 1.0);
+    float rg = std::max((light * 2.0) - .5, 0.0);
+    return rgba(rg, rg, b, 1);
 }
 
 void writeImage(const std::string &filename, size_t width, size_t height, const u32 *data) {
@@ -100,6 +103,7 @@ void workerMain(MandelBrot &mandelbrot, u32 threadId, u32 numThreads) {
     const size_t h = mandelbrot.getHeight();
     size_t numPixels = w * h;
     for (size_t blockNum = threadId; blockNum * BLOCK_SIZE < numPixels; blockNum += numThreads) {
+        // TODO: SIMD the actual escape times
         for (size_t i = 0; i < BLOCK_SIZE && blockNum * BLOCK_SIZE + i < numPixels; ++i) {
             int pixelNum = blockNum * BLOCK_SIZE + i;
             size_t imageX = pixelNum % w;
