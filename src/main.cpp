@@ -35,7 +35,7 @@ class MandelBrot {
     std::pair<double, double> getPosition(size_t x, size_t y) {
         double px = x / (double)width;
         double py = y / (double)height;
-        return {2 * px - 1, 2 * py - 1};
+        return {2 * px - 1.5, 2 * py - 1};
     }
 
     const u32 *getRGBA() const { return pixels.data(); }
@@ -58,7 +58,20 @@ u32 rgba(double r, double g, double b, double a) {
 }
 // clang-format on
 
-u32 colorPixel(double x, double y) { return rgba(1, 0, 0.5, 1); }
+u32 colorPixel(float x, float y) {
+    float cx = 0.0;
+    float cy = 0.0;
+    u32 iter = 0;
+    while (iter < 256 && cx * cx + cy * cy < 2.0) {
+        const float ncx = cx * cx - cy * cy;
+        const float ncy = 2 * cx * cy;
+        cx = ncx + x;
+        cy = ncy + y;
+        ++iter;
+    }
+    u32 light = 256 - iter;
+    return rgba(light / 256.0, light / 256.0, 0, 1);
+}
 
 void writeImage(const std::string &filename, size_t width, size_t height, const u32 *data) {
     std::string_view view(filename);
@@ -72,16 +85,20 @@ void writeImage(const std::string &filename, size_t width, size_t height, const 
 }
 
 void workerMain(MandelBrot &mandelbrot, u32 threadId, u32 numThreads) {
+    // 64 byte cache line
+    const size_t BLOCK_SIZE = 64 / sizeof(u32);
     const size_t w = mandelbrot.getWidth();
     const size_t h = mandelbrot.getHeight();
     size_t numPixels = w * h;
-    // TODO: Stride pattern that doesn't result in false sharing :-)
-    for (size_t i = threadId; i < numPixels; i += numThreads) {
-        size_t imageX = i % w;
-        size_t imageY = i / w;
-        auto pos = mandelbrot.getPosition(imageX, imageY);
-        u32 pixel = colorPixel(std::get<0>(pos), std::get<1>(pos));
-        mandelbrot.getPixelRef(imageX, imageY) = pixel;
+    for (size_t blockNum = threadId; blockNum * BLOCK_SIZE < numPixels; blockNum += numThreads) {
+        for (size_t i = 0; i < BLOCK_SIZE && blockNum * BLOCK_SIZE + i < numPixels; ++i) {
+            int pixelNum = blockNum * BLOCK_SIZE + i;
+            size_t imageX = pixelNum % w;
+            size_t imageY = pixelNum / w;
+            auto pos = mandelbrot.getPosition(imageX, imageY);
+            u32 pixel = colorPixel(std::get<0>(pos), std::get<1>(pos));
+            mandelbrot.getPixelRef(imageX, imageY) = pixel;
+        }
     }
 }
 
